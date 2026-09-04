@@ -16,7 +16,6 @@ from rasterio.features import geometry_mask
 from rasterio.transform import from_bounds as fb
 from scipy.interpolate import griddata
 from shapely.geometry import mapping
-from tqdm import tqdm
 
 from .trophic import TROPHIC_CLASSES, TROPHIC_MARKER
 
