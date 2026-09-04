@@ -1,7 +1,6 @@
 streamlit>=1.37
 requests
 earthengine-api>=0.1.400
-geemap>=0.32
 geopandas>=0.14
 rasterio>=1.3
 scipy>=1.11
@@ -14,3 +13,4 @@ xgboost
 torch
 joblib
 shapely
+matplotlib
