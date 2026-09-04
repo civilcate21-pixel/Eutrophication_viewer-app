@@ -24,7 +24,7 @@ from lake_tsi.raster_utils import load_tiff_to_dataframe, save_tsi_heatmap_tiff
 from lake_tsi.shapefile_utils import load_lake_geometry_from_zip
 from lake_tsi.trophic import overall_trophic
 
-st.set_page_config(page_title="Lake Trophic Status", layout="wide")
+st.set_page_config(page_title="Lake Trophic Status", page_icon="assets/eutrophicated_icon.jpg" ,layout="wide")
 
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
