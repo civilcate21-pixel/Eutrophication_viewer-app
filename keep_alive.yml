@@ -1,0 +1,15 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    # Runs every 6 hours (at minute 0 of hours 0, 6, 12, 18)
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub UI
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send HTTP Request to Streamlit
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" https://your-app.streamlit.app
