@@ -542,7 +542,7 @@ def build_interactive_map(gdf: gpd.GeoDataFrame, result_df: pd.DataFrame, overal
     Map.get_root().html.add_child(Element(index_legends_html))
     Map.get_root().html.add_child(Element(js_watcher))
     Map.get_root().html.add_child(Element(panel_html))
-    folium.LayerControl().add_to(Map)
+    folium.LayerControl(collapsed=False).add_to(Map)
     Map.save(out_html)
     return Map
 

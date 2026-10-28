@@ -19,10 +19,11 @@ import streamlit.components.v1 as components
 
 from lake_tsi.gee_utils import build_median_composite, download_composite_direct, initialise_gee_service_account
 from lake_tsi.mapping import build_interactive_map
-from lake_tsi.models import load_model, predict_tsi
+from lake_tsi.index_info import DATA_NOTE, INDEX_INFO, REFERENCES
+from lake_tsi.models import get_model_info, load_model, predict_tsi
 from lake_tsi.raster_utils import load_tiff_to_dataframe, save_tsi_heatmap_tiff
 from lake_tsi.shapefile_utils import load_lake_geometry_from_zip
-from lake_tsi.trophic import overall_trophic
+from lake_tsi.trophic import TROPHIC_CLASSES, overall_trophic
 
 st.set_page_config(page_title="Lake Trophic Status", page_icon="assets/eutrophicated_icon.jpg" ,layout="wide")
 
@@ -36,8 +37,25 @@ def available_models() -> dict:
         glob.glob(os.path.join(MODELS_DIR, "*.joblib")) + \
         glob.glob(os.path.join(MODELS_DIR, "*.pth")) + \
         glob.glob(os.path.join(MODELS_DIR, "*.pt"))
-    return {os.path.basename(p): p for p in paths}
+    models = {}
+    for p in sorted(paths):
+        fname = os.path.basename(p)
+        label = get_model_info(fname, MODELS_DIR).get("display_name") or fname
+        if label in models:
+            label = f"{label} ({fname})"
+        models[label] = p
 
+    return models
+
+def show_model_info(info: dict) -> None:
+
+    if info.get("model_type"):
+        st.markdown(f"**Model type:** {info['model_type']}")
+    if info.get("description"):
+        st.markdown(f"**Description:** {info['description']}")
+    metrics = {k: v for k, v in (info or {}).items() if v is not None and k != "model_type" and k != "description"}
+    if metrics:
+        st.dataframe(pd.DataFrame({"Metric": list(metrics.keys()), "Value": [str(v) for v in metrics.values()]}), hide_index=True, use_container_width=True)
 
 st.title("🌊 Lake Trophic Status — Sentinel-2 + Earth Engine")
 st.caption(
@@ -53,7 +71,11 @@ with st.sidebar:
     with col_a:
         study_year = st.text_input("Study year", value=str(dt.date.today().year))
     with col_b:
-        season = st.selectbox("Season", ["Pre-Monsoon", "Post-Monsoon", "Winter", "Summer", "Other"])
+        season = st.text_input(
+            "Season (optional)", value="", placeholder="e.g. Pre-Monsoon",
+            help="A label shown on the map header only. The imagery is chosen by the date range below. "
+                 "Leave empty to skip.",
+        )
 
     st.divider()
     shapefile_zip = st.file_uploader(
@@ -65,35 +87,57 @@ with st.sidebar:
         "Sentinel-2 date range",
         value=(dt.date.today() - dt.timedelta(days=90), dt.date.today()),
     )
-    cloud_pct = st.slider("Max cloud cover (%)", 0, 100, 20)
+    cloud_pct = st.slider("Max cloud cover (%)", 0, 100, 10)
     scale = st.select_slider("Export resolution (m/pixel)", options=[10, 20, 30, 60], value=20)
 
     st.divider()
     models = available_models()
     if not models:
         st.warning("No model files found in models/. Add a .pkl/.joblib/.pth file there.")
-    model_choice = st.selectbox("Trophic-state model", list(models.keys()) if models else ["(none available)"])
-
+    model_choice = st.selectbox("Trophic-state model", list(models.keys()) if models else ["(None available)"])
+    if models:
+        _info = get_model_info(os.path.basename(models[model_choice]), MODELS_DIR)
+        if _info:
+            with st.expander("Model details and performance"):
+                show_model_info(_info)
+    
+    output_dir = st.text_input(
+    "Output directory",
+    value=os.path.join(os.getcwd(), "outputs"),
+    help="Folder where the generated GeoTIFFs and HTML map will be saved."
+)
     st.divider()
     run_button = st.button("Run analysis", type="primary", use_container_width=True)
+
 
 
 if run_button:
     if not shapefile_zip:
         st.error("Please upload a shapefile (.zip) first.")
         st.stop()
+
     if not models:
         st.error("No model available — add one to the models/ folder and reload.")
         st.stop()
+
     if len(date_range) != 2:
         st.error("Please select a start and end date.")
         st.stop()
 
+    if not output_dir.strip():
+        st.error("Please specify an output directory.")
+        st.stop()
+
     start_date, end_date = str(date_range[0]), str(date_range[1])
-    work_dir = tempfile.mkdtemp()
-    tiff_path = os.path.join(work_dir, "composite.tif")
-    tsi_tiff_path = os.path.join(work_dir, "tsi_heatmap.tif")
-    map_html_path = os.path.join(work_dir, "map.html")
+
+    output_dir = os.path.abspath(os.path.expanduser(output_dir.strip()))
+    os.makedirs(output_dir, exist_ok=True)
+
+    tiff_path = os.path.join(output_dir, "composite.tif")
+    tsi_tiff_path = os.path.join(output_dir, "tsi_heatmap.tif")
+    map_html_path = os.path.join(output_dir, "map.html")
+
+    st.success(f"Output directory: {output_dir}")
 
     try:
         with st.status("Running analysis…", expanded=True) as status:
@@ -156,6 +200,12 @@ if "map_html_path" in st.session_state and os.path.exists(st.session_state["map_
     unc = st.session_state.get("uncertainty_mean")
     m4.metric("Mean model uncertainty", f"±{unc:.2f}" if unc is not None else "n/a")
 
+    st.info(
+        "💡 Use the **layer panel at the top-right of the map** to explore the other layers: "
+        "TSI heatmap, MNDWI, NDCI, Chl-a, FAI, MAI, CI Red-Edge, the lake boundary and the basemaps. "
+        "Click a point to see its TSI, status and Chl-a."
+    )
+
     with open(st.session_state["map_html_path"], "r", encoding="utf-8") as f:
         map_html = f.read()
     components.html(map_html, height=800, scrolling=False)
@@ -164,3 +214,17 @@ if "map_html_path" in st.session_state and os.path.exists(st.session_state["map_
     st.download_button("Download pixel-level results (CSV)", csv_bytes, "tsi_results.csv", "text/csv")
 else:
     st.info("Fill in the inputs on the left and click **Run analysis** to generate the map.")
+
+st.divider()
+with st.expander("About the indices and method"):
+    st.markdown(DATA_NOTE)
+    idx_df = pd.DataFrame(INDEX_INFO).fillna("-")
+    st.dataframe(idx_df, hide_index=True, use_container_width=True)
+    st.markdown("**Carlson TSI classes**")
+    st.dataframe(
+        pd.DataFrame([{"Class": c["label"], "TSI range": c["range"], "Meaning": c["short"]} for c in TROPHIC_CLASSES]),
+        hide_index=True, use_container_width=True,
+    )
+    st.markdown("**References**")
+    for ref in REFERENCES:
+        st.markdown(f"- {ref}")

@@ -4,6 +4,7 @@ Ported from the notebook's model-loading block in main() (cell 16) plus the
 BNN_MCD class + predict_bnn from cell 15. Logic unchanged; just reorganised
 into functions callable from Streamlit without CLI prompts.
 """
+import json
 import os
 
 import joblib
@@ -105,3 +106,22 @@ def predict_tsi(pixel_df: pd.DataFrame, model, kind: str) -> tuple[pd.DataFrame,
         result_df[f] = pixel_df[f].values
 
     return result_df, uncertainty
+
+
+def load_model_registry(models_dir: str = "models") -> dict:
+    """Read the optional models/model_registry.json (display names + performance details)."""
+    path = os.path.join(models_dir, "model_registry.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def get_model_info(filename: str, models_dir: str = "models") -> dict:
+    """Metadata for one model file ({} if it has no registry entry)."""
+    info = load_model_registry(models_dir).get(filename, {})
+    return info if isinstance(info, dict) else {}

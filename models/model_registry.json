@@ -1,0 +1,22 @@
+{
+  "rf_model.pkl": {
+    "display_name": "Random Forest",
+    "model_type": "Random Forest regressor",
+    "description": "Parallel Decision Trees, Bagging method for final model.",
+    "metrics": { "R2": 0.69, "RMSE": 9.10, "MAE": 6.9 }
+  },
+
+  "xgb_model.pkl": {
+    "display_name": "XGBoost",
+    "model_type": "Gradient boosting regressor",
+    "description": "Sequential Decision Trees, Gradient boosting method for final model.",
+    "metrics": { "R2": 0.46, "RMSE": 12.16, "MAE": 9.46 }
+  },
+
+  "bnn_mcd_model.pth": {
+    "display_name": "Bayesian Neural Network (MC Dropout)",
+    "model_type": "Bayesian NN with Monte-Carlo dropout",
+    "description": "Predicts TSI together with a per-pixel uncertainty estimate from repeated stochastic forward passes.",
+    "metrics": { "R2": 0.51, "RMSE": 10.89, "MAE": 7.75 }
+  }
+}
